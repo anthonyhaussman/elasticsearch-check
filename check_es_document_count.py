@@ -87,6 +87,8 @@ if __name__ == '__main__':
         with open(date_file, 'r') as f:
             previous_date = f.read()
         f.closed
+    else:
+        previous_date = today
 
     with open(date_file, 'w') as f:
         f.write(str(today))
