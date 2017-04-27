@@ -24,7 +24,7 @@ usage = """
 Check document creation increasement in a specific index
 
 exemple :
-%s -H es-03.gcp.dailymotion.com -p 9200 -B 'user:password' -I logstash -W 100 -C 0
+%s -H es-03 -p 9200 -B 'user:password' -I logstash -W 100 -C 0
 
 """ % (sys.argv[0])
 

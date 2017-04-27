@@ -18,15 +18,15 @@ CRITICAL = 2
 UNKNOWN = 3
 
 usage = """
-Check healh of an es cluster
+Check heap memory percent use on a node
 
 exemple :
-%s -H es-03 -p 9200 -B 'user:password'
+%s -H es-02 -p 9200 -N es-02 -B 'user:password' -W 80 -C 90
 
 """ % (sys.argv[0])
 
-def read_stats(host, port, auth):
-    stats_url = ''.join(['http://', host,':', port, '/_cluster/health'])
+def read_stats(host, port, node, auth):
+    stats_url = ''.join(['http://', host,':', port, '/_nodes/', node,'/stats'])
      
     try:
         req = urllib2.Request(stats_url)
@@ -53,24 +53,41 @@ if __name__ == '__main__':
                       help="Basic auth string 'username:password'",
                       dest="auth",
                       default=None)
+    parser.add_option("-N", "--node", dest="node",
+                      help="Name of the node to check")
+    parser.add_option("-W", "--warning", dest="warn", help="Warning Threshold")
+    parser.add_option("-C", "--critical", dest="crit", help="Critical Threshold")
     (options,args) = parser.parse_args()
 
     if not options.host:
         print(usage)
         parser.error("The host option is mandatory. ex : 10.18.71.1")
+    elif not options.node:
+        print(usage)
+        parser.error("The node option is mandatory. ex : es-01")
+    elif not options.warn:
+        print(usage)
+        parser.error("The warning threshold must be set")
+    elif not options.crit:
+        print(usage)
+        parser.error("The critical threshold must be set")
+    elif options.warn > options.crit:
+        print(usage)
+        parser.error("The warning value must be lower than critical")
 
-    data = read_stats(options.host, options.port, options.auth)
+    data = read_stats(options.host, options.port, options.node, options.auth)
     stats = json.loads(data)
 
-    status = stats['status']
+    heap_percent = stats['nodes'].values()[0]['jvm']['mem']['heap_used_percent']
+    print heap_percent
 
     # Exit code
-    if status == str('yellow'):
-        print("WARNING : The ES cluster is in %s status" % (status))
+    if heap_percent >= int(options.warn) and heap_percent < int(options.crit):
+        print('WARNING : Heap memory on {} = {}%'.format(options.node, heap_percent))
         sys.exit(WARNING)
-    elif status == str('red'):
-        print("CRITICAL : The ES cluster is in %s status" % (status))
+    elif heap_percent >= int(options.crit):
+        print('CRITICAL : Heap memory on {} = {}%'.format(options.node, heap_percent))
         sys.exit(CRITICAL)
     else:
-        print("OK : The ES cluster is in %s status" % (status))
+        print('OK : Heap memory on {} = {}%'.format(options.node, heap_percent))
         sys.exit(OK)
