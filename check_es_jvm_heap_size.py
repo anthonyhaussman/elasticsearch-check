@@ -79,7 +79,6 @@ if __name__ == '__main__':
     stats = json.loads(data)
 
     heap_percent = stats['nodes'].values()[0]['jvm']['mem']['heap_used_percent']
-    print heap_percent
 
     # Exit code
     if heap_percent >= int(options.warn) and heap_percent < int(options.crit):
