@@ -21,7 +21,7 @@ CRITICAL = 2
 UNKNOWN = 3
 
 usage = """
-Collects Http codes counters from Nginx server.
+Check document creation increasement in a specific index
 
 exemple :
 %s -H es-03.gcp.dailymotion.com -p 9200 -B 'user:password' -I logstash -W 100 -C 0
