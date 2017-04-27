@@ -11,6 +11,7 @@ import urllib2
 import json
 import datetime
 import base64
+from datetime import date, timedelta
 from optparse import OptionParser
 
 # Exit statuses recognized by Shinken
@@ -27,10 +28,8 @@ exemple :
 
 """ % (sys.argv[0])
 
-def read_stats(host, port, index, auth):
-    today = datetime.date.today()
-    date = today.strftime('-%Y.%m.%d')
-    stats_url = ''.join(['http://', host,':', port, '/_cat/count/', index, date ,'?format=json'])
+def read_stats(host, port, index, auth, date):
+    stats_url = ''.join(['http://', host,':', port, '/_cat/count/', index, '-', date ,'?format=json'])
      
     try:
         req = urllib2.Request(stats_url)
@@ -73,10 +72,29 @@ if __name__ == '__main__':
         print(usage)
         parser.error("The critical threshold must be set")
 
-    data = read_stats(options.host, options.port, options.index, options.auth)
+    today = datetime.date.today()
+    date = today.strftime('%Y.%m.%d')
+
+    data = read_stats(options.host, options.port, options.index, options.auth, date)
     stats = json.loads(data)
 
     count = stats[0]['count']
+    current_hour = stats[0]['timestamp']
+    yesterday = datetime.date.today() - timedelta(1)
+
+    date_file = '/tmp/.date-%s-%s-%s' % ( os.path.basename(sys.argv[0]).rsplit(".",1)[0],options.host, options.index)
+    if os.path.isfile(date_file):
+        with open(date_file, 'r') as f:
+            previous_date = f.read()
+        f.closed
+
+    with open(date_file, 'w') as f:
+        f.write(str(today))
+    f.closed
+
+    if previous_date != str(today):
+        print("UNKNOWN: Waiting for new index")
+        sys.exit(UNKNOWN)
 
     old_statsfile = '/tmp/.%s-%s-%s' % ( os.path.basename(sys.argv[0]).rsplit(".",1)[0],options.host, options.index)
     if os.path.isfile(old_statsfile):
