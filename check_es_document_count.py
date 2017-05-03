@@ -7,6 +7,7 @@ Count the number of documents created in a specific ElasticSearch index
 """
 import sys
 import os
+import errno
 import urllib2
 import json
 import datetime
@@ -44,6 +45,13 @@ def read_stats(host, port, index, auth, date):
         data = response.read()
     return(data)
 
+def silentremove(filename):
+    try:
+        os.remove(filename)
+    except OSError as e: # this would be "except OSError, e:" before Python 2.6
+        if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
+            raise # re-raise exception if a different error occurred
+
 if __name__ == '__main__':
 
     parser = OptionParser(version="1.0")
@@ -79,26 +87,21 @@ if __name__ == '__main__':
     stats = json.loads(data)
 
     count = stats[0]['count']
-    current_hour = stats[0]['timestamp']
-    yesterday = datetime.date.today() - timedelta(1)
 
     date_file = '/tmp/.date-%s-%s-%s' % ( os.path.basename(sys.argv[0]).rsplit(".",1)[0],options.host, options.index)
+    old_statsfile = '/tmp/.%s-%s-%s' % ( os.path.basename(sys.argv[0]).rsplit(".",1)[0],options.host, options.index)
+
     if os.path.isfile(date_file):
         with open(date_file, 'r') as f:
             previous_date = f.read()
         f.closed
-    else:
-        previous_date = today
 
-    with open(date_file, 'w') as f:
-        f.write(str(today))
-    f.closed
+    if str(previous_date) != str(today):
+        with open(date_file, 'w') as f:
+            f.write(str(today))
+        f.closed
+        silentremove(old_statsfile)
 
-    if previous_date != str(today):
-        print("UNKNOWN: Waiting for new index")
-        sys.exit(UNKNOWN)
-
-    old_statsfile = '/tmp/.%s-%s-%s' % ( os.path.basename(sys.argv[0]).rsplit(".",1)[0],options.host, options.index)
     if os.path.isfile(old_statsfile):
         with open(old_statsfile, 'r') as f:
             old_stats = json.loads(f.read())
