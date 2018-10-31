@@ -27,8 +27,12 @@ exemple :
 
 def read_stats(scheme,host, port, auth, cert, key):
     stats_url = ''.join([scheme, '://', host,':', port, '/_cluster/health'])
+
     try:
         response = requests.get(stats_url, cert=(cert, key), auth=auth)
+        if not response.status_code // 100 == 2:
+            print "Error: Unexpected response {}".format(response)
+            sys.exit(CRITICAL)
     except requests.exceptions.HTTPError as err:
         print err
         sys.exit(CRITICAL)
@@ -54,11 +58,11 @@ if __name__ == '__main__':
                       help="Basic auth string 'username:password'",
                       dest="auth",
                       default=None)
-    parser.add_option("-C", "--certificate",
+    parser.add_option("-c", "--certificate",
                       help="Client certificate path",
                       dest="cert",
                       default=None)
-    parser.add_option("-K", "--key",
+    parser.add_option("-k", "--key",
                       help="Client certificate key path",
                       dest="key",
                       default=None)
@@ -77,14 +81,14 @@ if __name__ == '__main__':
         print "CRITICAL : Need to specify the SSL option (-S or --ssl)"
         sys.exit(CRITICAL)
     elif options.cert and not options.key:
-        print "CRITICAL : Need to specify the key file (-K or --key)"
+        print "CRITICAL : Need to specify the key file (-k or --key)"
         sys.exit(CRITICAL)
 
     if options.key and not options.ssl:
         print "CRITICAL : Need to specify the SSL option (-S or --ssl)"
         sys.exit(CRITICAL)
     elif options.key and not options.cert:
-        print "CRITICAL : Need to specify the certificate file (-C or --cert)"
+        print "CRITICAL : Need to specify the certificate file (-c or --cert)"
         sys.exit(CRITICAL)
 
     if options.auth:
