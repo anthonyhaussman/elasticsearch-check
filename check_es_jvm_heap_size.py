@@ -113,7 +113,7 @@ if __name__ == '__main__':
        options.auth = HTTPBasicAuth(login, password)
 
 
-    data = read_stats(scheme,options.host, options.port, options.node, options.auth, options.cert, options.key)
+    data = read_stats(scheme, options.host, options.port, options.node, options.auth, options.cert, options.key)
     stats = json.loads(data)
 
     heap_percent = stats['nodes'].values()[0]['jvm']['mem']['heap_used_percent']

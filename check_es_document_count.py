@@ -6,12 +6,13 @@ License stuff
 Count the number of documents created in a specific ElasticSearch index
 """
 import sys
+import json
+import requests
 import os
 import errno
-import urllib2
 import json
 import datetime
-import base64
+from requests.auth import HTTPBasicAuth
 from datetime import date, timedelta
 from optparse import OptionParser
 
@@ -29,20 +30,23 @@ exemple :
 
 """ % (sys.argv[0])
 
-def read_stats(host, port, index, auth, date):
-    stats_url = ''.join(['http://', host,':', port, '/_cat/count/', index, '-', date ,'?format=json'])
-     
+def read_stats(scheme, host, port, index, auth, date, cert, key):
+    stats_url = ''.join([scheme, '://', host,':', port, '/_cat/count/', index, '-', date ,'?format=json'])
+
     try:
-        req = urllib2.Request(stats_url)
-        if auth:
-            base64str = base64.encodestring(auth).replace('\n', '')
-            req.add_header('Authorization', 'Basic %s' % base64str)
-        response = urllib2.urlopen(req, timeout=5)
-    except urllib2.URLError, e:
-        print("UNKNOWN : %s" % e)
-        sys.exit(UNKNOWN)
+        response = requests.get(stats_url, cert=(cert, key), auth=auth)
+        if not response.status_code // 100 == 2:
+            print "Error: Unexpected response {}".format(response)
+            sys.exit(CRITICAL)
+    except requests.exceptions.HTTPError as err:
+        print err
+        sys.exit(CRITICAL)
+    except requests.exceptions.RequestException as e:  # This is the correct syntax
+        print e
+        sys.exit(CRITICAL)
     else:
-        data = response.read()
+        data = response.content
+    response.close
     return(data)
 
 def silentremove(filename):
@@ -68,6 +72,16 @@ if __name__ == '__main__':
                       default=None)
     parser.add_option("-W", "--warning", dest="warn", help="Warning Threshold")
     parser.add_option("-C", "--critical", dest="crit", help="Critical Threshold")
+    parser.add_option("-S", "--ssl", action="store_true", dest="ssl",
+                      help="Enable SSL scheme to connect on ES")
+    parser.add_option("-c", "--certificate",
+                      help="Client certificate path",
+                      dest="cert",
+                      default=None)
+    parser.add_option("-k", "--key",
+                      help="Client certificate key path",
+                      dest="key",
+                      default=None)
     (options,args) = parser.parse_args()
 
     if not options.host:
@@ -80,10 +94,34 @@ if __name__ == '__main__':
         print(usage)
         parser.error("The critical threshold must be set")
 
+    if options.ssl:
+       scheme="https"
+    else:
+       scheme="http"
+
+    if options.cert and not options.ssl:
+        print "CRITICAL : Need to specify the SSL option (-S or --ssl)"
+        sys.exit(CRITICAL)
+    elif options.cert and not options.key:
+        print "CRITICAL : Need to specify the key file (-k or --key)"
+        sys.exit(CRITICAL)
+
+    if options.key and not options.ssl:
+        print "CRITICAL : Need to specify the SSL option (-S or --ssl)"
+        sys.exit(CRITICAL)
+    elif options.key and not options.cert:
+        print "CRITICAL : Need to specify the certificate file (-c or --cert)"
+        sys.exit(CRITICAL)
+
+    if options.auth:
+       login=options.auth.split(":", 1)[0]
+       password=options.auth.split(":", 1)[1]
+       options.auth = HTTPBasicAuth(login, password)
+
     today = datetime.date.today()
     date = today.strftime('%Y.%m.%d')
 
-    data = read_stats(options.host, options.port, options.index, options.auth, date)
+    data = read_stats(scheme, options.host, options.port, options.index, options.auth, date, options.cert, options.key)
     stats = json.loads(data)
 
     count = stats[0]['count']
