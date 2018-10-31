@@ -6,9 +6,9 @@ License stuff
 Count the number of documents created in a specific ElasticSearch index
 """
 import sys
-import urllib2
 import json
-import base64
+import requests
+from requests.auth import HTTPBasicAuth
 from optparse import OptionParser
 
 # Exit statuses recognized by Shinken
@@ -25,20 +25,23 @@ exemple :
 
 """ % (sys.argv[0])
 
-def read_stats(host, port, node, auth):
-    stats_url = ''.join(['http://', host,':', port, '/_nodes/', node,'/stats'])
-     
+def read_stats(scheme, host, port, node, auth, cert, key):
+    stats_url = ''.join([scheme, '://', host,':', port, '/_nodes/', node,'/stats'])
+
     try:
-        req = urllib2.Request(stats_url)
-        if auth:
-            base64str = base64.encodestring(auth).replace('\n', '')
-            req.add_header('Authorization', 'Basic %s' % base64str)
-        response = urllib2.urlopen(req, timeout=5)
-    except urllib2.URLError, e:
-        print("UNKNOWN : %s" % e)
-        sys.exit(UNKNOWN)
+        response = requests.get(stats_url, cert=(cert, key), auth=auth)
+        if not response.status_code // 100 == 2:
+            print "Error: Unexpected response {}".format(response)
+            sys.exit(CRITICAL)
+    except requests.exceptions.HTTPError as err:
+        print err
+        sys.exit(CRITICAL)
+    except requests.exceptions.RequestException as e:  # This is the correct syntax
+        print e
+        sys.exit(CRITICAL)
     else:
-        data = response.read()
+        data = response.content
+    response.close
     return(data)
 
 if __name__ == '__main__':
@@ -57,6 +60,16 @@ if __name__ == '__main__':
                       help="Name of the node to check")
     parser.add_option("-W", "--warning", dest="warn", help="Warning Threshold")
     parser.add_option("-C", "--critical", dest="crit", help="Critical Threshold")
+    parser.add_option("-S", "--ssl", action="store_true", dest="ssl",
+                      help="Enable SSL scheme to connect on ES")
+    parser.add_option("-c", "--certificate",
+                      help="Client certificate path",
+                      dest="cert",
+                      default=None)
+    parser.add_option("-k", "--key",
+                      help="Client certificate key path",
+                      dest="key",
+                      default=None)
     (options,args) = parser.parse_args()
 
     if not options.host:
@@ -75,7 +88,32 @@ if __name__ == '__main__':
         print(usage)
         parser.error("The warning value must be lower than critical")
 
-    data = read_stats(options.host, options.port, options.node, options.auth)
+    if options.ssl:
+       scheme="https"
+    else:
+       scheme="http"
+
+    if options.cert and not options.ssl:
+        print "CRITICAL : Need to specify the SSL option (-S or --ssl)"
+        sys.exit(CRITICAL)
+    elif options.cert and not options.key:
+        print "CRITICAL : Need to specify the key file (-k or --key)"
+        sys.exit(CRITICAL)
+
+    if options.key and not options.ssl:
+        print "CRITICAL : Need to specify the SSL option (-S or --ssl)"
+        sys.exit(CRITICAL)
+    elif options.key and not options.cert:
+        print "CRITICAL : Need to specify the certificate file (-c or --cert)"
+        sys.exit(CRITICAL)
+
+    if options.auth:
+       login=options.auth.split(":", 1)[0]
+       password=options.auth.split(":", 1)[1]
+       options.auth = HTTPBasicAuth(login, password)
+
+
+    data = read_stats(scheme, options.host, options.port, options.node, options.auth, options.cert, options.key)
     stats = json.loads(data)
 
     heap_percent = stats['nodes'].values()[0]['jvm']['mem']['heap_used_percent']
