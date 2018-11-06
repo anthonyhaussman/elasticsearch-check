@@ -30,11 +30,11 @@ exemple :
 
 """ % (sys.argv[0])
 
-def read_stats(scheme, host, port, index, auth, date, cert, key):
+def read_stats(scheme, host, port, index, auth, date, cert, key, ca):
     stats_url = ''.join([scheme, '://', host,':', port, '/_cat/count/', index, '-', date ,'?format=json'])
 
     try:
-        response = requests.get(stats_url, cert=(cert, key), auth=auth)
+        response = requests.get(stats_url, cert=(cert, key), verify=ca, auth=auth)
         if not response.status_code // 100 == 2:
             print "Error: Unexpected response {}".format(response)
             sys.exit(CRITICAL)
@@ -82,6 +82,10 @@ if __name__ == '__main__':
                       help="Client certificate key path",
                       dest="key",
                       default=None)
+    parser.add_option("-a", "--certificate-authority",
+                      help="Certificate Authority path",
+                      dest="ca",
+                      default=None)
     (options,args) = parser.parse_args()
 
     if not options.host:
@@ -121,7 +125,7 @@ if __name__ == '__main__':
     today = datetime.date.today()
     date = today.strftime('%Y.%m.%d')
 
-    data = read_stats(scheme, options.host, options.port, options.index, options.auth, date, options.cert, options.key)
+    data = read_stats(scheme, options.host, options.port, options.index, options.auth, date, options.cert, options.key, options.ca)
     stats = json.loads(data)
 
     count = stats[0]['count']

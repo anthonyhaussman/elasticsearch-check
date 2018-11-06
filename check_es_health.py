@@ -25,11 +25,11 @@ exemple :
 
 """ % (sys.argv[0])
 
-def read_stats(scheme,host, port, auth, cert, key):
+def read_stats(scheme,host, port, auth, cert, key, ca):
     stats_url = ''.join([scheme, '://', host,':', port, '/_cluster/health'])
 
     try:
-        response = requests.get(stats_url, cert=(cert, key), auth=auth)
+        response = requests.get(stats_url, cert=(cert, key), verify=ca, auth=auth)
         if not response.status_code // 100 == 2:
             print "Error: Unexpected response {}".format(response)
             sys.exit(CRITICAL)
@@ -66,6 +66,10 @@ if __name__ == '__main__':
                       help="Client certificate key path",
                       dest="key",
                       default=None)
+    parser.add_option("-a", "--certificate-authority",
+                      help="Certificate Authority path",
+                      dest="ca",
+                      default=None)
     (options,args) = parser.parse_args()
 
     if not options.host:
@@ -96,7 +100,7 @@ if __name__ == '__main__':
        password=options.auth.split(":", 1)[1]
        options.auth = HTTPBasicAuth(login, password)
 
-    data = read_stats(scheme,options.host, options.port, options.auth, options.cert, options.key)
+    data = read_stats(scheme,options.host, options.port, options.auth, options.cert, options.key, options.ca)
     stats = json.loads(data)
 
     status = stats['status']
