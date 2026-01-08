@@ -4,6 +4,8 @@ Author : Anthony Hausman
 License stuff
 
 Count the number of documents created in a specific ElasticSearch index
+
+MAJ
 """
 import sys
 import json
